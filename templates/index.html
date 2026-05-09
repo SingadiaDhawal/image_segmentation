@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>AI Segmentation Hotspot Detection</title>
+
+    <style>
+
+        body {
+
+            background: #111;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        button {
+
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-left: 10px;
+            border: none;
+            border-radius: 6px;
+        }
+
+        #container {
+
+            position: relative;
+            display: inline-block;
+        }
+
+        #image {
+
+            max-width: 1000px;
+            display: block;
+            border-radius: 10px;
+        }
+
+        #svgOverlay {
+
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .segment {
+
+            fill: rgba(0,255,0,0.08);
+            stroke: transparent;
+            stroke-width: 4;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .segment:hover {
+
+            fill: rgba(0,255,0,0.15);
+            stroke: lime;
+        }
+
+        .label {
+
+            position: absolute;
+            background: lime;
+            color: black;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            pointer-events: none;
+            display: none;
+            z-index: 999;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <h1>AI Interactive Segmentation</h1>
+
+    <input type="file" id="fileInput">
+
+    <button onclick="uploadImage()">
+        Detect Objects
+    </button>
+
+    <br><br>
+
+    <div id="container">
+
+        <img id="image">
+
+        <svg id="svgOverlay"></svg>
+
+    </div>
+
+    <script>
+
+        async function uploadImage() {
+
+            const fileInput =
+                document.getElementById("fileInput")
+
+            const file = fileInput.files[0]
+
+            if (!file) {
+
+                alert("Select image")
+
+                return
+            }
+
+            const formData = new FormData()
+
+            formData.append("image", file)
+
+            const response = await fetch(
+                "/detect",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            )
+
+            const data = await response.json()
+
+            const img =
+                document.getElementById("image")
+
+            const svg =
+                document.getElementById("svgOverlay")
+
+            img.src =
+                "data:image/jpeg;base64," +
+                data.image_base64
+
+            img.onload = () => {
+
+                svg.innerHTML = ""
+
+                document
+                    .querySelectorAll(".label")
+                    .forEach(e => e.remove())
+
+                svg.setAttribute(
+                    "width",
+                    img.width
+                )
+
+                svg.setAttribute(
+                    "height",
+                    img.height
+                )
+
+                svg.style.width =
+                    img.width + "px"
+
+                svg.style.height =
+                    img.height + "px"
+
+                data.detections.forEach(det => {
+
+                    const polygon =
+                        document.createElementNS(
+                            "http://www.w3.org/2000/svg",
+                            "polygon"
+                        )
+
+                    const points =
+                        det.polygon
+                            .map(
+                                p => `${p[0]},${p[1]}`
+                            )
+                            .join(" ")
+
+                    polygon.setAttribute(
+                        "points",
+                        points
+                    )
+
+                    polygon.setAttribute(
+                        "class",
+                        "segment"
+                    )
+
+                    const label =
+                        document.createElement("div")
+
+                    label.className = "label"
+
+                    label.innerHTML =
+                        det.label.toUpperCase()
+
+                    label.style.left =
+                        det.polygon[0][0] + "px"
+
+                    label.style.top =
+                        det.polygon[0][1] + "px"
+
+                    polygon.addEventListener(
+                        "mouseenter",
+                        () => {
+
+                            polygon.style.stroke =
+                                "lime"
+
+                            polygon.style.fill =
+                                "rgba(0,255,0,0.15)"
+
+                            label.style.display =
+                                "block"
+                        }
+                    )
+
+                    polygon.addEventListener(
+                        "mouseleave",
+                        () => {
+
+                            polygon.style.stroke =
+                                "transparent"
+
+                            polygon.style.fill =
+                                "rgba(0,255,0,0.08)"
+
+                            label.style.display =
+                                "none"
+                        }
+                    )
+
+                    polygon.addEventListener(
+                        "click",
+                        () => {
+
+                            document
+                                .querySelectorAll(
+                                    ".segment"
+                                )
+                                .forEach(seg => {
+
+                                    seg.style.stroke =
+                                        "transparent"
+
+                                    seg.style.fill =
+                                        "rgba(0,255,0,0.08)"
+                                })
+
+                            polygon.style.stroke =
+                                "cyan"
+
+                            polygon.style.fill =
+                                "rgba(0,255,255,0.18)"
+
+                            label.style.display =
+                                "block"
+                        }
+                    )
+
+                    svg.appendChild(polygon)
+
+                    document
+                        .getElementById("container")
+                        .appendChild(label)
+                })
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
